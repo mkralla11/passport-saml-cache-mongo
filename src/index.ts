@@ -28,7 +28,7 @@ export interface SchemaAndModelArg {
   // expires: number
 }
 
-export function createPassportSamlCacheMongoCollectionSchemaAndModel(config?: SchemaAndModelArg) {
+export function createPassportSamlCacheMongoCollectionSchema(config?: SchemaAndModelArg) {
   return new Schema<SamlSsoSchemaInterface>({
     key: {
       type: String,

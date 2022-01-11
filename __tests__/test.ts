@@ -1,6 +1,6 @@
 import mongoCacheProvider, {
   MongoCacheProvider,
-  createPassportSamlCacheMongoCollectionSchemaAndModel,
+  createPassportSamlCacheMongoCollectionSchema,
   SamlSsoSchemaInterface,
 } from '../src'
 import { promisify } from 'util'
@@ -80,7 +80,7 @@ describe('test suite', function () {
   beforeEach(async function () {
     await dropAllMongoData()
 
-    SamlSsoAttemptsSchema = createPassportSamlCacheMongoCollectionSchemaAndModel()
+    SamlSsoAttemptsSchema = createPassportSamlCacheMongoCollectionSchema()
 
     SamlSsoAttemptsModel = model<SamlSsoSchemaInterface>(collectionName, SamlSsoAttemptsSchema)
   }, 60000)
