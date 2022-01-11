@@ -1,0 +1,8 @@
+{
+  "extends": "@digabi/eslint-config",
+  "rules": {
+    "@typescript-eslint/require-await": "off"
+  },
+  "parserOptions": { "project": "./tsconfig.test.json" },
+  "ignorePatterns": ["node_modules", "dist", "helpers/connectToMongo.ts", "helpers/setupEnvHelper.js"]
+}

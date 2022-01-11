@@ -1,0 +1,22 @@
+version: '3.7'
+services:
+  mongo:
+    # container_name: hero-dev-mongo
+    image: mongo:5.0.5
+    restart: unless-stopped
+    ports:
+      - 27017-27019:27017-27019
+    volumes:
+      - docker_data_cache_mongo_data:/data/db
+    networks:
+      - pscr_dev
+    # environment:
+    #   MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME}
+    #   MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+networks:
+  pscr_dev:
+    name: pscr_dev
+    driver: bridge
+volumes:
+  docker_data_cache_mongo_data:
+    name: pscm_docker_data_cache_mongo_data_${NODE_ENV:-dev}
