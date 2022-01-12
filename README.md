@@ -19,7 +19,7 @@ import { Strategy as SamlStrategy } from 'passport-saml'
 import mongoCacheProvider from 'mongo-saml-cache-mongo'
 
 // First, you must create a mongo connection with mongoose/mongodb
-const cacheProvider = mongoCacheProvider(mongoClient, {collectionName: "SamlSsoAttempts", tlMillis: 600000})
+const cacheProvider = mongoCacheProvider(mongoClient, { collectionName: 'SamlSsoAttempts', tlMillis: 600000 })
 
 // MAKE SURE YOU CALL THE SETUP FUNCTION!!!!
 await cacheProvider.setup()
@@ -28,7 +28,7 @@ await cacheProvider.setup()
 passport.use(
   new SamlStrategy({
     //... other passport-saml options,
-    cacheProvider
+    cacheProvider,
   })
 )
 ```
