@@ -22,30 +22,22 @@ async function dropAllMongoData(client: MongoClient) {
   if (process.env.NODE_ENV !== 'test') {
     throw new Error('Cannot drop all mongo data unless you are in test environment')
   }
-  // eslint-disable-next-line no-debugger
-  debugger
+
   await client
     .db()
     .listCollections()
     .map(async (c: CollectionInfo) => {
       try {
-        // eslint-disable-next-line no-debugger
-        debugger
         // @ts-ignore
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
         await client.db().collection(c.name).deleteMany({})
-        // await c.deleteMany({})
       } catch (e) {
-        // eslint-disable-next-line no-debugger
-        debugger
         // console.log('could not drop collection, ignoring', c.collectionName)
         // we don't care about this error at this point,
         // we are just trying to clean everything up
       }
     })
     .toArray()
-  // eslint-disable-next-line no-debugger
-  debugger
 }
 
 describe('test suite', function () {
@@ -116,8 +108,6 @@ describe('test suite', function () {
 
     describe('saveAsync()', () => {
       it('returns the new value & timestamp if key does not exist', async function () {
-        // eslint-disable-next-line no-debugger
-        debugger
         const res = await saveAsync('key', 'val')
         let value
         if (res !== null) {
