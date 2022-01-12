@@ -16,27 +16,19 @@ Use the
 
 ```typescript
 import { Strategy as SamlStrategy } from 'passport-saml'
-import mongoCacheProvider, {
-  createPassportSamlCacheMongoCollectionSchema,
-  SamlSsoSchemaInterface,
-} from 'mongo-saml-cache-mongo'
-import mongoose, { Mongoose, model, Model, Schema } from 'mongoose'
+import mongoCacheProvider from 'mongo-saml-cache-mongo'
 
-// First, you must create a mongo connection with mongoose.
-// ...
-// Then you can create the model that will be used for the cache
-// as shown below
+// First, you must create a mongo connection with mongoose/mongodb
+const cacheProvider = mongoCacheProvider(mongoClient, {collectionName: "SamlSsoAttempts", tlMillis: 600000})
 
-SamlSsoAttemptsSchema = createPassportSamlCacheMongoCollectionSchema()
+// MAKE SURE YOU CALL THE SETUP FUNCTION!!!!
+await cacheProvider.setup()
 
-// you can name the collection whatever you want
-const collectionName = 'saml_sso_attempts'
-SamlSsoAttemptsModel = model<SamlSsoSchemaInterface>(collectionName, SamlSsoAttemptsSchema)
-
+// ...and finally pass the mongoClient instance to mongoCacheProvider
 passport.use(
   new SamlStrategy({
     //... other passport-saml options,
-    cacheProvider: mongoCacheProvider(SamlSsoAttemptsModel), // provide the model instance
+    cacheProvider
   })
 )
 ```
@@ -46,7 +38,7 @@ passport.use(
 The `mongoCacheProvider` function accepts an optional second argument. The default options are as follows:
 
 ```typescript
-mongoCacheProvider(pool, {
+mongoCacheProvider(mongoClient, {
   // The maximum age of a cache entry in milliseconds.
   ttlMillis: 600000, // 10 minutes,
   // A logger to use. By default, messages are logged to console.
