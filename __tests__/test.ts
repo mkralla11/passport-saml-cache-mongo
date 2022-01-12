@@ -1,14 +1,11 @@
-import mongoCacheProvider, {
-  MongoCacheProvider,
-  createPassportSamlCacheMongoCollectionSchema,
-  SamlSsoSchemaInterface,
-} from '../src'
+import mongoCacheProvider, { MongoCacheProvider } from '../src'
 import { promisify } from 'util'
 import { promises as fs } from 'fs'
 import * as path from 'path'
 import type { CacheItem } from 'node-saml'
-import mongoose, { Mongoose, model, Model, Schema } from 'mongoose'
-import connectToMongo, { mongoCredsInterface } from '../helpers/connectToMongo'
+import mongoose, { Mongoose } from 'mongoose'
+import connectToMongo, { MongoCredsInterface, ConnectToMongoReturnVal } from '../helpers/connectToMongo'
+import { MongoClient, CollectionInfo } from 'mongodb'
 
 declare const process: {
   env: {
@@ -21,35 +18,43 @@ declare const process: {
   }
 }
 
-async function dropAllMongoData() {
+async function dropAllMongoData(client: MongoClient) {
   if (process.env.NODE_ENV !== 'test') {
     throw new Error('Cannot drop all mongo data unless you are in test environment')
   }
-  const dropDataPromises = Object.values(mongoose.connection.collections).map(async (c) => {
-    try {
-      await c.deleteMany({})
-    } catch (e) {
-      // console.log('could not drop collection, ignoring', c.collectionName)
-      // we don't care about this error at this point,
-      // we are just trying to clean everything up
-    }
-  })
-
-  await Promise.all(dropDataPromises)
-  // @ts-ignore
-  mongoose.models = {}
-  // @ts-ignore
-  mongoose.modelSchemas = {}
+  // eslint-disable-next-line no-debugger
+  debugger
+  await client
+    .db()
+    .listCollections()
+    .map(async (c: CollectionInfo) => {
+      try {
+        // eslint-disable-next-line no-debugger
+        debugger
+        // @ts-ignore
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+        await client.db().collection(c.name).deleteMany({})
+        // await c.deleteMany({})
+      } catch (e) {
+        // eslint-disable-next-line no-debugger
+        debugger
+        // console.log('could not drop collection, ignoring', c.collectionName)
+        // we don't care about this error at this point,
+        // we are just trying to clean everything up
+      }
+    })
+    .toArray()
+  // eslint-disable-next-line no-debugger
+  debugger
 }
 
 describe('test suite', function () {
   const ttlMillis = 2000
   const delay = promisify(setTimeout)
 
-  const collectionName = 'saml_sso_attempts'
-  let SamlSsoAttemptsSchema: Schema<SamlSsoSchemaInterface>
-  let SamlSsoAttemptsModel: Model<SamlSsoSchemaInterface>
+  const collectionName = 'SamlSsoAttemptsNamed'
   let mongo: Mongoose
+  let mongoClient: MongoClient
   let cache: MongoCacheProvider
   let getAsync: (key: string) => Promise<string | null>
   let saveAsync: (key: string, value: any) => Promise<CacheItem | null>
@@ -58,7 +63,7 @@ describe('test suite', function () {
   beforeAll(async function () {
     const { MONGO_HOST, MONGO_PORT, MONGO_DB_NAME } = process.env
 
-    const mongoCreds: mongoCredsInterface = {
+    const mongoCreds: MongoCredsInterface = {
       host: MONGO_HOST,
       port: MONGO_PORT,
       // password: MONGO_PASSWORD,
@@ -66,10 +71,9 @@ describe('test suite', function () {
       dbName: MONGO_DB_NAME,
     }
 
-    await connectToMongo({
+    ;({ client: mongoClient, mongoose: mongo } = await connectToMongo({
       mongoCreds,
-    })
-    mongo = mongoose
+    }))
   }, 60000)
 
   afterAll(async function () {
@@ -78,18 +82,13 @@ describe('test suite', function () {
   })
 
   beforeEach(async function () {
-    await dropAllMongoData()
-
-    SamlSsoAttemptsSchema = createPassportSamlCacheMongoCollectionSchema()
-
-    SamlSsoAttemptsModel = model<SamlSsoSchemaInterface>(collectionName, SamlSsoAttemptsSchema)
+    await dropAllMongoData(mongoClient)
   }, 60000)
 
   describe('with pre-instantiated CacheProvider', () => {
     beforeEach(async function () {
-      // await dropAllMongoData()
-
-      cache = mongoCacheProvider(SamlSsoAttemptsModel, { ttlMillis })
+      cache = mongoCacheProvider(mongoClient, { collectionName, ttlMillis })
+      await cache.setup()
       removeAsync = cache.removeAsync
       getAsync = cache.getAsync
       saveAsync = cache.saveAsync
@@ -117,6 +116,8 @@ describe('test suite', function () {
 
     describe('saveAsync()', () => {
       it('returns the new value & timestamp if key does not exist', async function () {
+        // eslint-disable-next-line no-debugger
+        debugger
         const res = await saveAsync('key', 'val')
         let value
         if (res !== null) {
@@ -128,7 +129,7 @@ describe('test suite', function () {
       it('throws an error if key already exists', async function () {
         await saveAsync('key', 'val1')
         return expect(saveAsync('key', 'val2')).rejects.toThrow(
-          'E11000 duplicate key error collection: pscmlib.saml_sso_attempts index: key_1 dup key: { key: "key" }'
+          `E11000 duplicate key error collection: pscmlib.${collectionName} index: key_1 dup key: { key: "key" }`
         )
       })
     })
@@ -157,13 +158,30 @@ describe('test suite', function () {
   describe('error handling', () => {
     it('calls the callback with an error object if an error occurs', async function () {
       const mockModel = {
-        create: jest.fn(() => Promise.reject(new Error('Boom!'))),
-        find: jest.fn(() => Promise.reject(new Error('Boom!'))),
-        deleteOne: jest.fn(() => Promise.reject(new Error('Boom!'))),
-        deleteMany: jest.fn(() => {}),
+        db: () => {
+          const collection = jest.fn(() => {
+            const col = {
+              insertOne: jest.fn(() => Promise.reject(new Error('Boom!'))),
+              find: jest.fn(() => {
+                return {
+                  toArray: jest.fn(() => Promise.reject(new Error('Boom!'))),
+                }
+              }),
+              deleteOne: jest.fn(() => Promise.reject(new Error('Boom!'))),
+              deleteMany: jest.fn(() => {}),
+              createIndex: jest.fn(() => Promise.resolve()),
+            }
+            return col
+          })
+
+          return {
+            collection,
+          }
+        },
       }
 
       const cache = mongoCacheProvider(mockModel as any)
+      await cache.setup()
 
       const error = new Error('Boom!')
       await expect(cache.getAsync('key')).rejects.toThrow(error)

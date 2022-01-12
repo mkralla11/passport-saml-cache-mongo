@@ -1,7 +1,8 @@
 const { promisify } = require('util')
 import mongoose, { Mongoose } from 'mongoose'
+import { MongoClient } from 'mongodb'
 
-export interface mongoCredsInterface {
+export interface MongoCredsInterface {
   host: string
   port: string
   // password: string
@@ -9,22 +10,34 @@ export interface mongoCredsInterface {
   dbName: string
 }
 
-export interface connectToMongoArg {
-  mongoCreds: mongoCredsInterface
+export interface ConnectToMongoArg {
+  mongoCreds: MongoCredsInterface
 }
 
-type connectToMongoFn = (connectToMongoArg: connectToMongoArg) => Promise<void>
+export interface ConnectToMongoReturnVal {
+  mongoose: Mongoose
+  client: MongoClient
+}
+
+type connectToMongoFn = (ConnectToMongoArg: ConnectToMongoArg) => Promise<ConnectToMongoReturnVal>
 
 const connectToMongo: connectToMongoFn = async function connectToMongo({ mongoCreds }) {
   const { host, port, dbName } = mongoCreds
   console.log(mongoCreds)
   const connUrl = `mongodb://${host}:${port}/${dbName}`
-  await new Promise((resolve, reject) => {
-    mongoose.set('debug', true)
+  return await new Promise((resolve, reject) => {
+    // mongoose.set('debug', true)
     mongoose.connect(connUrl)
     mongoose.connection.once('connected', function () {
-      // console.info(`Mongo connection ready`)
-      resolve(mongoose)
+      // @ts-ignore
+      // console.info(`Mongo connection ready`, mongoose.connection.client)
+      resolve({
+        mongoose,
+        // connection: mongoose.connection,
+        // db: mongoose.connections[0].db,
+        // @ts-ignore
+        client: mongoose.connection.client,
+      })
     })
 
     mongoose.connection.once('error', function (err) {

@@ -4,19 +4,21 @@ import * as assert from 'assert'
 // must use package that the implementors split
 // passport-saml off from, specifically node-saml types
 import type { CacheProvider, CacheItem } from 'node-saml'
-import mongoose, { Mongoose, Document, model, Model } from 'mongoose'
-const Schema = mongoose.Schema
-const ObjectId = mongoose.mongo.ObjectId
-const ObjectIdType = mongoose.Schema.Types.ObjectId
+import { MongoClient, Collection, Db } from 'mongodb'
 
-import { BinaryLike, createHash, randomBytes } from 'crypto'
+// import mongoose, { Mongoose, Document, model, Model } from 'mongoose'
+// const Schema = mongoose.Schema
+// const ObjectId = mongoose.mongo.ObjectId
+// const ObjectIdType = mongoose.Schema.Types.ObjectId
+
+// import { BinaryLike, createHash, randomBytes } from 'crypto'
 
 // Make the key less prone to collision
 interface Metadata {
   [key: string]: number | string | null
 }
 
-export interface SamlSsoSchemaInterface extends Document {
+export interface SamlSsoSchemaInterface {
   // _id?: ObjectId
   key: string
   value: string
@@ -24,37 +26,38 @@ export interface SamlSsoSchemaInterface extends Document {
   meta?: Metadata
 }
 
-export interface SchemaAndModelArg {
-  // expires: number
-}
+// export interface SchemaAndModelArg {
+//   // expires: number
+// }
 
-export function createPassportSamlCacheMongoCollectionSchema(config?: SchemaAndModelArg) {
-  return new Schema<SamlSsoSchemaInterface>({
-    key: {
-      type: String,
-      required: true,
-      index: true,
-      unique: true,
-    },
-    value: {
-      type: String,
-      required: true,
-    },
-    createdAt: {
-      type: Date,
-      required: true,
-    },
-    meta: {
-      type: Schema.Types.Mixed,
-    },
-  })
-}
+// export function createPassportSamlCacheMongoCollectionSchema(config?: SchemaAndModelArg) {
+//   return new Schema<SamlSsoSchemaInterface>({
+//     key: {
+//       type: String,
+//       required: true,
+//       index: true,
+//       unique: true,
+//     },
+//     value: {
+//       type: String,
+//       required: true,
+//     },
+//     createdAt: {
+//       type: Date,
+//       required: true,
+//     },
+//     meta: {
+//       type: Schema.Types.Mixed,
+//     },
+//   })
+// }
 
 export interface Logger {
   info: (message: string) => void
   error: (message: string, err: Error) => void
 }
 export interface Options {
+  collectionName?: string
   /**
    * The maximum age of a cache entry in milliseconds. Entries older than this are deleted automatically.
    * Mongo automatically deletes entries using ttl mongo option every `ttlMillis` milliseconds.
@@ -69,6 +72,7 @@ export interface Options {
 const defaultOptions: Required<Options> = {
   ttlMillis: 600000,
   logger: console,
+  collectionName: 'saml_sso_attempts',
 }
 
 // interface ModelAndSchema<ModelType, SchemaType> {
@@ -79,19 +83,21 @@ const defaultOptions: Required<Options> = {
 export interface MongoCacheProvider extends CacheProvider {
   /** Close the cache. This stops the scheduled job that deletes old cache entries. */
   close: () => void
+  setup: () => Promise<void>
   // getModelAndSchema: <ModelType, SchemaType>() => ModelAndSchema<ModelType, SchemaType>
 }
 
 interface QueryResult {
   value: string
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-call
 
 /** Create a new Mongo cache provider for passport-saml. */
-export default function mongoCacheProvider(
-  model: Model<SamlSsoSchemaInterface>,
-  options?: Options
-): MongoCacheProvider {
-  const { ttlMillis, logger } = { ...defaultOptions, ...options }
+export default function mongoCacheProvider(mongoClient: MongoClient, options?: Options): MongoCacheProvider {
+  const { ttlMillis, collectionName, logger } = { ...defaultOptions, ...options }
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+  const db: Db = mongoClient.db()
+  const collection = db.collection<SamlSsoSchemaInterface>(collectionName)
 
   assert.ok(Number.isInteger(ttlMillis) && ttlMillis > 0, 'ttlMillis must be a positive integer')
   let closed = false
@@ -100,7 +106,7 @@ export default function mongoCacheProvider(
     async function sweep() {
       const nowMs = Date.now()
       if (!closed) {
-        await model.deleteMany({ createdAt: { $lte: nowMs - ttlMillis } })
+        await collection.deleteMany({ createdAt: { $lte: new Date(nowMs - ttlMillis) } })
       }
       timer = setTimeout(() => {
         sweep().catch((e: Error) => logger.error(e.message, e))
@@ -113,7 +119,8 @@ export default function mongoCacheProvider(
 
   return {
     getAsync: async function (key: string) {
-      const res: Array<SamlSsoSchemaInterface> = await model.find({ key })
+      // eslint-disable-next-line @typescript-eslint/await-thenable
+      const res: Array<SamlSsoSchemaInterface> = await collection.find({ key }).toArray()
       return res.length ? res[0].value : null
     },
     saveAsync: async function (key: string, value: string, meta?: Metadata) {
@@ -123,26 +130,20 @@ export default function mongoCacheProvider(
         value,
       }
 
-      const res = await model.create({ key, ...item, createdAt: createdAtDate, meta })
+      await collection.insertOne({ key, ...item, createdAt: createdAtDate, meta })
 
-      // const res = await mongo.set(`${hashedKey}:${key}`, JSON.stringify(item), 'PX', ttlMillis, 'NX')
-      // if (res !== 'OK') {
-      //   throw new Error('duplicate key value is not allowed')
-      // }
-
-      // return item
       return item
     },
     removeAsync: async function (key: string) {
-      const { deletedCount } = await model.deleteOne({ key })
+      const { deletedCount } = await collection.deleteOne({ key })
       return deletedCount > 0 ? key : null
     },
-    // getModelAndSchema: function () {
-    //   return {
-    //     model: SamlSsoAttemptsModel,
-    //     schema: SamlSsoAttemptsSchema,
-    //   }
-    // },
+    setup: async function () {
+      await Promise.all([
+        collection.createIndex({ key: 1 }, { unique: true }),
+        collection.createIndex({ createdAt: 1 }),
+      ])
+    },
     close: function () {
       clearTimeout(timer)
       closed = true
