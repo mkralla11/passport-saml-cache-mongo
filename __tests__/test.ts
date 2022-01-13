@@ -178,8 +178,9 @@ describe('test suite', function () {
       await expect(cache.saveAsync('key', 'value')).rejects.toThrow(error)
       await expect(cache.removeAsync('key')).rejects.toThrow(error)
 
-      await delay(ttlMillis * 2) // Wait a bit. The cleanup job error should fire as well.
+      await delay(ttlMillis * 2)
       cache.close()
+      await delay(ttlMillis * 2) 
     })
   })
 })
