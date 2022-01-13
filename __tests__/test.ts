@@ -180,7 +180,7 @@ describe('test suite', function () {
 
       await delay(ttlMillis * 2)
       cache.close()
-      await delay(ttlMillis * 2) 
+      await delay(ttlMillis * 2)
     })
   })
 })
