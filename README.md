@@ -1,8 +1,8 @@
 # passport-saml-cache-mongo
 
-<!--
+
 ![CI](https://github.com/mkralla11/passport-saml-cache-mongo/workflows/CI/badge.svg)
- -->
+
 
 A mongo-backed cache provider for [passport-saml](https://github.com/node-saml/passport-saml).
 
