@@ -38,7 +38,7 @@
     "build-lib": "tsc",
     "lint": "eslint .",
     "prettier-write": "prettier --write .",
-    "test": "jest --coverage --silent",
+    "test": "jest --coverage --silent --forceExit",
     "test-no-opts": "jest",
     "with-nodemon": "nodemon -e js,ts,json --exec \"$NODEMON_COMMAND\"",
     "docker:test": "NODE_ENV=test  MAIN_COMPOSE_COMMAND='npm run test' npm run docker:flow",
