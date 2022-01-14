@@ -177,8 +177,6 @@ describe('test suite', function () {
       await expect(cache.getAsync('key')).rejects.toThrow(error)
       await expect(cache.saveAsync('key', 'value')).rejects.toThrow(error)
       await expect(cache.removeAsync('key')).rejects.toThrow(error)
-
-      await delay(ttlMillis * 2)
       cache.close()
       await delay(ttlMillis * 2)
     })
